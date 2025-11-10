@@ -1,0 +1,15 @@
+:global(.file-explorer) {
+  box-shadow: 0px 2px 1px -1px rgba(0,0,0,0.2),0px 1px 1px 0px rgba(0,0,0,0.14),0px 1px 3px 0px rgba(0,0,0,0.12);
+  border-radius: 4px;
+  min-height: 150px;
+  border: 0
+}
+
+:global(.file-explorer .toolbar) {
+  min-height: 46px;
+}
+
+:global(.file-explorer .breadcrumb) {
+  padding-top: 10px;
+  min-height: 28px;
+}

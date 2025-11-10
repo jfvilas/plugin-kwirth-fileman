@@ -15,12 +15,11 @@ limitations under the License.
 */
 import { Entity } from '@backstage/catalog-model'
 import { createApiRef } from '@backstage/core-plugin-api'
-import { InstanceConfigScopeEnum } from '@jfvilas/kwirth-common'
 import { ClusterValidPods } from '@jfvilas/plugin-kwirth-common'
 
 export interface KwirthFilemanApi {
     getResources(entity:Entity): Promise<any>
-    requestAccess(entity:Entity, channel:string, scopes:InstanceConfigScopeEnum[]): Promise<ClusterValidPods[]>
+    requestAccess(entity:Entity, channel:string, scopes:string[]): Promise<ClusterValidPods[]>
     getVersion(): Promise<any>
     getInfo(): any
 }

@@ -13,29 +13,24 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import useAsync from 'react-use/esm/useAsync'
 
 import { Progress, WarningPanel } from '@backstage/core-components'
-import { useApi } from '@backstage/core-plugin-api'
+import { alertApiRef, useApi } from '@backstage/core-plugin-api'
 import { ANNOTATION_BACKSTAGE_KUBERNETES_LABELID, ANNOTATION_BACKSTAGE_KUBERNETES_LABELSELECTOR, isKwirthAvailable, ClusterValidPods, IStatusLine, getPodList, getContainerList, IBackendInfo } from '@jfvilas/plugin-kwirth-common'
 import { MissingAnnotationEmptyState, useEntity } from '@backstage/plugin-catalog-react'
 
 // kwirth
 import { kwirthFilemanApiRef } from '../api'
-import { accessKeySerialize, InstanceMessageActionEnum, InstanceConfigScopeEnum, InstanceConfigViewEnum, IInstanceMessage, InstanceMessageTypeEnum, SignalMessageLevelEnum, InstanceConfigObjectEnum, InstanceConfig, InstanceMessageFlowEnum, InstanceMessageChannelEnum } from '@jfvilas/kwirth-common'
+import { accessKeySerialize, InstanceMessageActionEnum, InstanceConfigViewEnum, IInstanceMessage, InstanceMessageTypeEnum, SignalMessageLevelEnum, InstanceConfigObjectEnum, InstanceConfig, InstanceMessageFlowEnum, SignalMessageEventEnum, ISignalMessage } from '@jfvilas/kwirth-common'
 
-// kwirthFileman components
-import { IOptions } from './IOptions'
-import { Options } from './Options'
-import { KwirthNews, ComponentNotFound, ObjectSelector, StatusLog, ClusterList, ErrorType } from '@jfvilas/plugin-kwirth-frontend'
+// kwirth fileman components
+import { KwirthNews, ComponentNotFound, StatusLog, ClusterList, ErrorType } from '@jfvilas/plugin-kwirth-frontend'
 import { VERSION } from '../index'
 
 // Material-UI
-import { Grid, Card, CardHeader, CardContent, Box, TextField, InputAdornment } from '@material-ui/core'
-import Divider from '@material-ui/core/Divider'
-import IconButton from '@material-ui/core/IconButton'
-import Typography from '@material-ui/core/Typography'
+import { Grid, Card, CardHeader, Box, IconButton, Typography } from '@material-ui/core'
 
 // Icons
 import PlayIcon from '@material-ui/icons/PlayArrow'
@@ -44,21 +39,19 @@ import StopIcon from '@material-ui/icons/Stop'
 import InfoIcon from '@material-ui/icons/Info'
 import WarningIcon from '@material-ui/icons/Warning'
 import ErrorIcon from '@material-ui/icons/Error'
-import KwirthFilemanLogo from '../assets/kwirthfiileman-logo.svg'
+import KwirthFilemanLogo from '../assets/kwirthfileman-logo.svg'
+import { v4 as uuid } from 'uuid'
+import { FileManager, IError, IFileData } from '@jfvilas/react-file-manager'
+import '@jfvilas/react-file-manager/dist/style.css'
+import styles from './custom-fm.module.css'
 
 export interface IEntityKwirthFilemanProps {
-    enableRestart: boolean
-    fromStart?: boolean
-    showTimestamp?: boolean
-    showNames?: boolean
-    followLog?: boolean
-    wrapLines?: boolean
 }
 
-export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (props:IEntityKwirthFilemanProps) => { 
+export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (_props:IEntityKwirthFilemanProps) => { 
     const { entity } = useEntity()
     const kwirthFilemanApi = useApi(kwirthFilemanApiRef)
-    //const alertApi = useApi(alertApiRef)
+    const alertApi = useApi(alertApiRef)
     const [validClusters, setResources] = useState<ClusterValidPods[]>([])
     const [selectedClusterName, setSelectedClusterName] = useState('')
     const [selectedNamespaces, setSelectedNamespaces] = useState<string[]>([])
@@ -68,41 +61,80 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
     const [stopped, setStopped] = useState(true)
     const paused=useRef<boolean>(false)
     const [statusMessages, setStatusMessages] = useState<IStatusLine[]>([])
-    const [websocket, setWebsocket] = useState<WebSocket>()
-    //const [instance, setInstance] = useState<string>()
-    const kwirthFilemanOptionsRef = useRef<IOptions>({
-        fromStart: props.fromStart!==undefined? props.fromStart : false, 
-        showTimestamp: props.showTimestamp!==undefined?props.showTimestamp:false, 
-        showNames: props.showNames!==undefined?props.showNames : true, 
-        followLog: props.followLog!==undefined? props.followLog : true, 
-        wrapLines: props.wrapLines!==undefined? props.wrapLines : false
-    })
+    const [webSocket, setWebSocket] = useState<WebSocket>()
     const [showStatusDialog, setShowStatusDialog] = useState(false)
     const [statusLevel, setStatusLevel] = useState<SignalMessageLevelEnum>(SignalMessageLevelEnum.INFO)
-    const preRef = useRef<HTMLPreElement|null>(null)
-    const lastRef = useRef<HTMLPreElement|null>(null)
     const [ backendVersion, setBackendVersion ] = useState<string>('')
     const [ backendInfo, setBackendInfo ] = useState<IBackendInfo>()
+    const instance = useRef<string>()
+    const [ stateFiles, setStateFiles ] = useState<IFileData[]>([])
+    const files = useRef<IFileData[]>([])
+    const [ currentPath, setCurrentPath] = useState('')
     const { loading, error } = useAsync ( async () => {
         if (backendVersion==='') setBackendVersion(await kwirthFilemanApi.getVersion())
         if (!backendInfo) setBackendInfo(await kwirthFilemanApi.getInfo())
-        let reqScopes = [InstanceConfigScopeEnum.VIEW]
-        if (props.enableRestart) reqScopes.push(InstanceConfigScopeEnum.RESTART)
+        let reqScopes = ['fileman$read']
         let data:ClusterValidPods[] = await kwirthFilemanApi.requestAccess(entity, 'fileman', reqScopes)
         setResources(data)
     })
-    const [filter, setFilter] = useState<string>('')
-    const [filterCasing, setFilterCasing] = useState(false)
-    const [filterRegex, setFilterRegex] = useState(false)
+    const filemanBoxRef = useRef<HTMLDivElement | null>(null)
+    const [filemanBoxTop, setFilemanBoxTop] = useState(0)
+    let permissions={
+        create: true,
+        delete: true,
+        download: true,
+        copy: true,
+        move: true,
+        rename: true,
+        upload: true
+    }
 
-    const adornmentSelected= { margin: 0, borderWidth:1, borderStyle:'solid', borderColor:'gray', paddingLeft:3, paddingRight:3, backgroundColor:'gray', cursor: 'pointer', color:'white'}
-    const adornmentNotSelected = { margin: 0, borderWidth:1, borderStyle: 'solid', borderColor:'#f0f0f0', backgroundColor:'#f0f0f0', paddingLeft:3, paddingRight:3, cursor:'pointer'}
-    const clickStart = (options:IOptions) => {
+    interface IFileUploadConfig  { 
+        url: string
+        method?: "POST" | "PUT"
+        headers?: { [key: string]: string }
+    }
+    let fileUploadConfig:IFileUploadConfig= {
+        url: ''
+    }
+
+    let cluster = validClusters.find(cluster => cluster.name===selectedClusterName)
+    if (cluster) {
+        let accessKey = cluster.accessKeys.get('fileman$read')
+        if (accessKey) {
+            fileUploadConfig = {
+                url: `${cluster.url}/channel/fileman/upload?key=${instance.current}`,
+                method:'POST',
+                headers: {
+                    'Authorization': 'Bearer '+ accessKeySerialize(accessKey)
+                }
+            }
+        }
+    }
+    
+    let level = currentPath.split('/').length - 1
+    if (level<3) {
+        permissions = {
+            create: false,
+            delete: false,
+            download: false,
+            copy: false,
+            move: false,
+            rename: false,
+            upload: false
+        }
+    }
+
+    useEffect(() => {
+        if (filemanBoxRef.current) setFilemanBoxTop(filemanBoxRef.current.getBoundingClientRect().top)
+    })
+
+    const clickStart = () => {
         if (!paused.current) {
             setStarted(true)
             paused.current=false
             setStopped(false)
-            startFilemanViewer(options)
+            startFilemanViewer()
         }
         else {
             paused.current=false
@@ -146,10 +178,202 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
         }
     }
 
-    const processFilemanMessage = (_wsEvent:any) => {
+    enum FilemanCommandEnum {
+        HOME = 'home',
+        DIR = 'dir',
+        CREATE = 'create',
+        RENAME = 'rename',
+        DELETE = 'delete',
+        MOVE = 'move',
+        COPY = 'copy',
+        UPLOAD = 'upload',
+        DOWNLOAD = 'download'
+    }
+
+    interface IFilemanMessage extends IInstanceMessage {
+        msgtype: 'filemanmessage'
+        id: string
+        accessKey: string
+        instance: string
+        namespace: string
+        group: string
+        pod: string
+        container: string
+        command: FilemanCommandEnum
+        params?: string[]
+    }
+
+    interface IFilemanMessageResponse extends IInstanceMessage {
+        msgtype: 'filemanmessageresponse'
+        id: string
+        command: FilemanCommandEnum
+        namespace: string
+        group: string
+        pod: string
+        container: string
+        data?: any
+    }
+
+    const processFilemanMessage = (wsEvent:any) => {
+        let msg:IFilemanMessage = JSON.parse(wsEvent.data)
+
+        switch (msg.type) {
+            case InstanceMessageTypeEnum.DATA: {
+                let response = JSON.parse(wsEvent.data) as IFilemanMessageResponse
+                switch(response.action) {
+                    case InstanceMessageActionEnum.COMMAND: {
+                        switch(response.command) {
+                            case FilemanCommandEnum.HOME:
+                                let data = response.data as string[]
+                                let nss = Array.from (new Set (data.map(n => n.split('/')[0])))
+                                nss.map(ns => {
+                                    if (!files.current.some(f => f.path === '/'+ ns)) {
+                                        files.current.push ({ name: ns, isDirectory: true, path: '/'+ ns, class:'namespace' })                                        
+                                    }
+                                    let podNames = Array.from (new Set (data.filter(a => a.split('/')[0]===ns).map(o => o.split('/')[1])))
+                                    podNames.map(p => {
+                                        if (!files.current.some(f => f.path === '/'+ns+'/'+p)) {
+                                            //filemanData.files.push({ name: p, isDirectory: true, path: '/'+ns+'/'+p, class:'pod' })
+                                            files.current.push ({ name: p, isDirectory: true, path: '/'+ns+'/'+p, class:'pod' })
+                                        }
+                                        let conts = Array.from (new Set (data.filter(a => a.split('/')[0]===ns && a.split('/')[1]===p).map(o => o.split('/')[2])))
+                                        conts.map(c => {
+                                            if (!files.current.some(f => f.path === '/'+ns+'/'+p+'/'+c)) {
+                                                //filemanData.files.push ({ name: c, isDirectory: true, path: '/'+ns+'/'+p+'/'+c, class:'container' })
+                                                files.current.push ({ name: c, isDirectory: true, path: '/'+ns+'/'+p+'/'+c, class:'container' })
+                                            }
+                                        })
+                                    })
+                                })
+                                setStateFiles([...files.current])
+                                break
+                            case FilemanCommandEnum.DIR:
+                                let content = JSON.parse(response.data)
+                                if (content.status==='Success') {
+                                    for (let o of content.metadata.object) {
+                                        let name = o.name.split('/')[o.name.split('/').length-1]
+                                        let e = {
+                                            name,
+                                            isDirectory: (o.type===1),
+                                            path: o.name,
+                                            updatedAt: new Date(+o.time).toISOString(),
+                                            size: +o.size,
+                                            ...(o.type===0? {class:'file'}:{})
+                                        }
+                                        let i = files.current.findIndex(f => f.path === e.path)
+                                        if (i>=0)
+                                            files.current[i]=e
+                                        else
+                                            files.current.push(e)
+                                    }
+                                    setStateFiles([...files.current])
+                                }
+                                else {
+                                    addMessage( SignalMessageLevelEnum.ERROR, content.text || content.message)
+                                }
+                                break
+                            case FilemanCommandEnum.RENAME: {
+                                    let content = JSON.parse(response.data)
+                                    if (content.status!=='Success') addMessage( SignalMessageLevelEnum.ERROR, content.text || content.message)
+                                }
+                                break
+                            case FilemanCommandEnum.DELETE: {
+                                let content = JSON.parse(response.data)
+                                if (content.status==='Success') {
+                                    let fname = content.metadata.object
+                                    files.current = files.current.filter(f => f.path !== fname)
+                                    files.current = files.current.filter(f => !f.path.startsWith(fname+'/'))
+                                    setStateFiles([...files.current])
+                                }
+                                else {
+                                    addMessage( SignalMessageLevelEnum.ERROR, content.text || content.message)
+                                }
+                                break
+                            }
+                            case FilemanCommandEnum.MOVE:
+                            case FilemanCommandEnum.COPY:
+                            case FilemanCommandEnum.CREATE: {
+                                let content = JSON.parse(response.data)
+                                if (content.status==='Success') {
+                                    //filemanData.files = filemanData.files.filter(f => f.path !== content.metadata.object)
+                                    let f = { 
+                                        name: (content.metadata.object as string).split('/').slice(-1)[0],
+                                        isDirectory: (content.metadata.type===1),
+                                        path: content.metadata.object,
+                                        updatedAt: new Date(+content.metadata.time).toISOString(), 
+                                        size: +content.metadata.size,
+                                        ...(content.metadata.type.type===0? {class:'file'}:{})
+                                    }
+                                    files.current.push(f)
+                                    setStateFiles([...files.current])
+                                }
+                                else {
+                                    addMessage( SignalMessageLevelEnum.ERROR, content.text || content.message)
+                                }
+                                break
+                            }
+                        }
+                    }
+                    break
+                }
+                break
+            }
+            case InstanceMessageTypeEnum.SIGNAL:
+                let signalMessage = JSON.parse(wsEvent.data) as ISignalMessage
+                if (signalMessage.flow === InstanceMessageFlowEnum.RESPONSE) {
+                    if (signalMessage.action === InstanceMessageActionEnum.START) {
+                        if (signalMessage.text) addMessage(SignalMessageLevelEnum.INFO, signalMessage.text)
+                        instance.current = signalMessage.instance
+                    }
+                    else {
+                        addMessage( SignalMessageLevelEnum.ERROR, wsEvent.data)
+                    }
+                }
+                else if (signalMessage.flow === InstanceMessageFlowEnum.UNSOLICITED) {
+                    let cluster = validClusters.find(cluster => cluster.name===selectedClusterName)
+                    if (cluster) {
+                        let accessKey = cluster.accessKeys.get('fileman$read')
+                        if (accessKey && instance?.current) {
+                            if (signalMessage.event === SignalMessageEventEnum.ADD) {
+                                let filemanMessage:IFilemanMessage = {
+                                    flow: InstanceMessageFlowEnum.REQUEST,
+                                    action: InstanceMessageActionEnum.COMMAND,
+                                    channel: 'fileman',
+                                    type: InstanceMessageTypeEnum.DATA,
+                                    accessKey: accessKeySerialize(accessKey),
+                                    instance: instance.current,
+                                    id: uuid(),
+                                    command: FilemanCommandEnum.HOME,
+                                    namespace: signalMessage.namespace!,
+                                    group: '',
+                                    pod: signalMessage.pod!,
+                                    container: signalMessage.container!,
+                                    params: [],
+                                    msgtype: 'filemanmessage'
+                                }
+                                let payload = JSON.stringify( filemanMessage )
+                                wsEvent.target.send(payload)
+                                if (signalMessage.text) addMessage( SignalMessageLevelEnum.INFO, signalMessage.text)
+                            }
+                        }
+                        else {
+                            addMessage( SignalMessageLevelEnum.INFO, 'Have no instance/accessKey')
+                        }
+                    }
+                    else {
+                        addMessage( SignalMessageLevelEnum.INFO, 'Have no cluster')
+                    }
+                }
+                break
+
+            default:
+                console.log(`Invalid message type ${msg.type}`)
+                break
+        }
     }
 
     const addMessage = (level:SignalMessageLevelEnum, text:string) => {
+        alertApi.post({ message: text, severity: level, display:'transient' })        
         setStatusMessages ((prev) => [...prev, {
             level,
             text,
@@ -179,7 +403,8 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
         }
     }
 
-    const websocketOnOpen = (ws:WebSocket, _options:IOptions) => {
+    const websocketOnOpen = (ws:WebSocket) => {
+        setWebSocket(ws)
         let cluster=validClusters.find(cluster => cluster.name === selectedClusterName)
         if (!cluster) {
             addMessage(SignalMessageLevelEnum.ERROR,'No cluster selected')
@@ -191,7 +416,7 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
             return
         }
         console.log(`WS connected`)
-        let accessKey = cluster.accessKeys.get(InstanceConfigScopeEnum.VIEW)
+        let accessKey = cluster.accessKeys.get('fileman$read')
         if (accessKey) {
             let containers:string[] = []
             if (selectedContainerNames.length>0) {
@@ -202,20 +427,19 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
                 }
             }
             let iConfig:InstanceConfig = {
-                channel: InstanceMessageChannelEnum.LOG,
+                channel: 'fileman',
                 objects: InstanceConfigObjectEnum.PODS,
                 action: InstanceMessageActionEnum.START,
                 flow: InstanceMessageFlowEnum.REQUEST,
                 instance: '',
                 accessKey: accessKeySerialize(accessKey),
-                scope: InstanceConfigScopeEnum.VIEW,
+                scope: 'fileman$read',
                 view: (selectedContainerNames.length > 0 ? InstanceConfigViewEnum.CONTAINER : InstanceConfigViewEnum.POD),
                 namespace: selectedNamespaces.join(','),
                 group: '',
                 pod: selectedPodNames.map(p => p).join(','),
                 container: containers.join(','),
-                data: {
-                },
+                data: {},
                 type: InstanceMessageTypeEnum.SIGNAL
             }
             ws.send(JSON.stringify(iConfig))
@@ -226,7 +450,7 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
         }
     }
 
-    const startFilemanViewer = (options:IOptions) => {
+    const startFilemanViewer = () => {
         let cluster=validClusters.find(cluster => cluster.name===selectedClusterName);
         if (!cluster) {
             addMessage(SignalMessageLevelEnum.ERROR,'No cluster selected')
@@ -235,10 +459,10 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
 
         try {
             let ws = new WebSocket(cluster.url)
-            ws.onopen = () => websocketOnOpen(ws, options)
+            ws.onopen = () => websocketOnOpen(ws)
             ws.onmessage = (event) => websocketOnMessage(event)
             ws.onclose = (event) => websocketOnClose(event)
-            setWebsocket(ws)
+            setWebSocket(ws)
         }
         catch (err) {
         }
@@ -253,25 +477,18 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
     }
 
     const stopFilemanViewer = () => {
-        websocket?.close()
-    }
-
-    const onChangeFilemanConfig = (options:IOptions) => {
-        kwirthFilemanOptionsRef.current=options
-        if (started) {
-            clickStart(options)
-        }
+        webSocket?.close()
     }
 
     const actionButtons = () => {
         let hasKey=false
         let cluster=validClusters.find(cluster => cluster.name===selectedClusterName)
         if (cluster) {
-            hasKey = Boolean(cluster.accessKeys.get(InstanceConfigScopeEnum.VIEW))
+            hasKey = Boolean(cluster.accessKeys.get('fileman$read'))
         }
 
         return <>
-            <IconButton onClick={() => clickStart(kwirthFilemanOptionsRef.current)} title="Play" disabled={started || !paused || selectedPodNames.length === 0 || !hasKey}>
+            <IconButton onClick={() => clickStart()} title="Play" disabled={started || !paused || selectedPodNames.length === 0 || !hasKey}>
                 <PlayIcon />
             </IconButton>
             <IconButton onClick={onClickPause} title="Pause" disabled={!((started && !paused.current) && selectedPodNames.length > 0)}>
@@ -317,15 +534,165 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
         setStatusMessages(statusMessages.filter(m=> m.level!==level))
         setShowStatusDialog(false)
     }
-    
-    const onSelectObject = (namespaces:string[], podNames:string[], containerNames:string[]) => {
-        setSelectedNamespaces(namespaces)
-        setSelectedPodNames(podNames)
-        setSelectedContainerNames(containerNames)
+
+    const onError = (error: IError, _file: IFileData) => {
+        addMessage( SignalMessageLevelEnum.ERROR, error.message)
     }
 
-    const onChangeFilter = (event: any) => {
-        setFilter(event.target?.value)
+    const onRename	= (file: IFileData, newName: string) => {
+        let [namespace,pod,container] = file.path.split('/').slice(1)
+        //filemanData.files = filemanData.files.filter (f => f.path!==file.path)
+        files.current = files.current.filter (f => f.path!==file.path)
+        setStateFiles([...files.current])
+        sendCommand(FilemanCommandEnum.RENAME, namespace, pod, container, [file.path, newName])
+    }
+
+    const onRefresh = () => {
+        if (level >= 3) {
+            files.current = files.current.filter ( f => !f.path.startsWith(currentPath+'/'))
+            //files.current = files.current.filter ( f => f.path!==currentPath)
+            getLocalDir(currentPath+'/')
+        }
+        else {
+            sendCommand(FilemanCommandEnum.HOME, '', '', '', [])
+        }
+
+    }
+    
+    const getLocalDir = (folder:string) => {
+        let cluster = validClusters.find(cluster => cluster.name===selectedClusterName)
+        if (cluster) {
+            let accessKey = cluster.accessKeys.get('fileman$read')
+            if (accessKey && instance?.current && webSocket) {
+                let [namespace,pod,container] = folder.split('/').slice(1)
+                let filemanMessage:IFilemanMessage = {
+                    flow: InstanceMessageFlowEnum.REQUEST,
+                    action: InstanceMessageActionEnum.COMMAND,
+                    channel: 'fileman',
+                    type: InstanceMessageTypeEnum.DATA,
+                    accessKey: accessKeySerialize(accessKey),
+                    instance: instance.current,
+                    id: uuid(),
+                    command: FilemanCommandEnum.DIR,
+                    namespace: namespace,
+                    group: '',
+                    pod: pod,
+                    container: container,
+                    params: [folder],
+                    msgtype: 'filemanmessage'
+                }
+                let payload = JSON.stringify(filemanMessage)
+                webSocket.send(payload)
+            }
+        }
+    }
+
+    const sendCommand = (command: FilemanCommandEnum, namespace:string, pod:string, container:string,  params:string[]) => {
+        let cluster = validClusters.find(cluster => cluster.name===selectedClusterName)
+        if (cluster) {
+            let accessKey = cluster.accessKeys.get('fileman$read')
+            if (accessKey && instance?.current && webSocket) {        
+                let filemanMessage:IFilemanMessage = {
+                    flow: InstanceMessageFlowEnum.REQUEST,
+                    action: InstanceMessageActionEnum.COMMAND,
+                    channel: 'fileman',
+                    type: InstanceMessageTypeEnum.DATA,
+                    accessKey: accessKeySerialize(accessKey),
+                    instance: instance.current,
+                    id: uuid(),
+                    command: command,
+                    namespace: namespace,
+                    group: '',
+                    pod: pod,
+                    container: container,
+                    params: params,
+                    msgtype: 'filemanmessage'
+                }
+                let payload = JSON.stringify( filemanMessage )
+                webSocket.send(payload)
+            }
+            else {
+                addMessage( SignalMessageLevelEnum.ERROR, 'Have no instance/accessKey')
+            }
+        }
+        else {
+            addMessage( SignalMessageLevelEnum.ERROR, 'Have no cluster')
+        }
+    }
+
+    const onDelete = async (filesToDelete: IFileData[]) => {
+        for (let file of filesToDelete) {
+            let [namespace,pod,container] = file.path.split('/').slice(1)
+            sendCommand(FilemanCommandEnum.DELETE, namespace, pod, container, [file.path])
+        }
+    }
+
+    const onCreateFolder = async (name: string, parentFolder: IFileData) => {
+        let [namespace,pod,container] = parentFolder.path.split('/').slice(1)
+        sendCommand(FilemanCommandEnum.CREATE, namespace, pod, container, [parentFolder.path + '/' + name])
+    }
+
+    const onDownload = async (filesToDownload: Array<IFileData>) => {
+        let cluster = validClusters.find(cluster => cluster.name===selectedClusterName)
+        if (cluster) {
+            let accessKey = cluster.accessKeys.get('fileman$read')
+            if (accessKey) {
+
+                for (let file of filesToDownload) {
+                    const url = `${cluster.url}/channel/fileman/download?key=${instance.current}&filename=${file.path}`
+                    
+                    try {
+                        const response = await fetch(url, { headers: { 'Authorization': 'Bearer '+ accessKeySerialize(accessKey) } })
+
+                        if (response.ok) {
+                            const blob = await response.blob()
+
+                            const link = document.createElement('a')
+                            link.href = URL.createObjectURL(blob)
+                            link.download = file.path.split('/').slice(-1)[0]
+                            if (file.isDirectory) link.download += '.tar.gz'
+                            document.body.appendChild(link)
+                            link.click()
+                            document.body.removeChild(link)
+                            URL.revokeObjectURL(link.href)
+                        }
+                        else {
+                            console.error(`Error downloading file: ${file.path}`)
+                            addMessage( SignalMessageLevelEnum.ERROR, `Error downloading file ${file.path}: (${response.status}) ${await response.text()}`)
+                        }
+                    }
+                    catch (error) {
+                        console.error(`Error downloading file: ${file.path}`, error)
+                        addMessage( SignalMessageLevelEnum.ERROR, `Error downloading file ${file.path}: ${error}`)
+                    }
+                }
+            }
+            else {
+                addMessage( SignalMessageLevelEnum.ERROR, 'Have no instance/accessKey')
+            }
+        }
+        else {
+            addMessage( SignalMessageLevelEnum.ERROR, 'Have no cluster')
+        }
+    }
+
+    const onPaste = (filesToPaste: Array<IFileData>, destFolder:IFileData, operation:string) => {
+        let command = operation==='move'? FilemanCommandEnum.MOVE : FilemanCommandEnum.COPY
+        for (let file of filesToPaste) {
+            let [namespace,pod,container] = file.path.split('/').slice(1)
+            sendCommand(command, namespace, pod, container, [file.path, destFolder.path])
+        }        
+    }
+
+    const onFolderChange = (folder:string) => {
+        setCurrentPath(folder)
+        folder +='/'
+        let level = folder.split('/').length - 1
+        if (level > 3) getLocalDir(folder)
+    }
+
+    const onFileUploading = (file: IFileData, _parentFolder: IFileData) => { 
+        return { filename: currentPath + '/' + file.name }
     }
 
     return (<>
@@ -349,17 +716,12 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
         }
 
         { isKwirthAvailable(entity) && !loading && validClusters && validClusters.length>0 && validClusters.reduce((sum,cluster) => sum+cluster.pods.length, 0)>0 &&
-            <Box sx={{ display: 'flex', height:'70vh'}}>
+            <Box sx={{ display: 'flex', height:'100%'}}>
                 <Box sx={{ width: '200px', maxWidth:'200px'}}>
                     <Grid container direction='column'>
                         <Grid item>        
                             <Card>
                                 <ClusterList resources={validClusters} selectedClusterName={selectedClusterName} onSelect={onSelectCluster}/>
-                            </Card>
-                        </Grid>
-                        <Grid item>
-                            <Card>
-                                <Options options={kwirthFilemanOptionsRef.current} onChange={onChangeFilemanConfig} disabled={selectedContainerNames.length === 0 || started || paused.current}/>
                             </Card>
                         </Grid>
                         <Grid item>
@@ -377,44 +739,38 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
                     }
 
                     { selectedClusterName && <>
-                        <Card style={{ marginTop:-8, height:'100%', display:'flex', flexDirection:'column' }}>
+                        <Card style={{ marginTop:-8, marginBottom:'8px' }}>
                             <CardHeader
                                 title={statusButtons(selectedClusterName)}
                                 style={{marginTop:-4, marginBottom:4, flexShrink:0}}
                                 action={actionButtons()}
                             />
-                            
-                            <Grid container style={{alignItems:'end'}}>
-                                <Grid item style={{width:'66%'}}>
-                                    <Typography style={{marginLeft:14}}>
-                                        <ObjectSelector cluster={validClusters.find(cluster => cluster.name === selectedClusterName)!} onSelect={onSelectObject} disabled={selectedClusterName === '' || started || paused.current} selectedNamespaces={selectedNamespaces} selectedPodNames={selectedPodNames} selectedContainerNames={selectedContainerNames} scope={InstanceConfigScopeEnum.VIEW}/>
-                                    </Typography>
-                                </Grid>
-                                <Grid item style={{width:'33%', marginLeft:0}} >
-                                    <TextField value={filter} onChange={onChangeFilter} label='Filter' fullWidth style={{marginBottom:6, marginLeft:0}} disabled={!started} 
-                                        InputProps={{    endAdornment: 
-                                            <>
-                                                <InputAdornment position="start" onClick={() => started && setFilterRegex(!filterRegex)} style={{margin: 0}}>
-                                                    <Typography style={filterRegex? adornmentSelected : adornmentNotSelected}>.*</Typography>
-                                                </InputAdornment>
-                                                <InputAdornment position="start" onClick={() => started && setFilterCasing(!filterCasing)} style={{margin: 0, marginLeft:1}}>
-                                                    <Typography style={filterCasing? adornmentSelected : adornmentNotSelected}>Aa</Typography>
-                                                </InputAdornment>
-                                            </>
-                                        }}
-                                    />
-                                </Grid>
-                            </Grid>
-                            <Divider/>
-                            <CardContent style={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                                <Box style={{ overflowY: 'auto', width: '100%', flexGrow: 1 }}>
-                                    <pre ref={preRef} style={{overflowX: (kwirthFilemanOptionsRef.current.wrapLines?'hidden':'auto'),  whiteSpace: (kwirthFilemanOptionsRef.current.wrapLines ? 'pre-wrap' : 'pre'), wordBreak: kwirthFilemanOptionsRef.current.wrapLines ? 'break-word' : 'normal'}} >
-                                        {/* { messages.map (m => formatMessage(m)) } */}
-                                    </pre>
-                                    <span ref={lastRef}/>
-                                </Box>                                
-                            </CardContent>
                         </Card>
+                        { started && <Grid ref={filemanBoxRef} style={{height: `calc(100vh - ${filemanBoxTop}px - 35px)`}}>
+                            <FileManager 
+                            className={styles.customFm}
+                            files={stateFiles}
+                            filePreviewPath='http://avoid-console-error'
+                            primaryColor='#1976d2'
+                            fontFamily='"Helvetica Neue", Helvetica, Roboto, Arial, sans-serif'
+                            height='100%'
+                            actions={new Map()}
+                            icons={new Map()} 
+                            fileUploadConfig={fileUploadConfig} 
+                            onCreateFolder={onCreateFolder}
+                            onError={onError}
+                            onRename={onRename}
+                            onPaste={onPaste}
+                            onDelete={onDelete}
+                            onFolderChange={onFolderChange}
+                            onRefresh={onRefresh}
+                            onFileUploading={onFileUploading}
+                            onDownload={onDownload}
+                            enableFilePreview={false}
+                            initialPath={''}
+                            permissions={permissions}
+                        />
+                        </Grid>}
                     </>}
                 </Box>
             </Box>
