@@ -173,7 +173,20 @@ First *select the cluster* on the cluster card. On the card on right, you will s
 
 ![running](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-fileman/master/images/kwirthfileman-running.png)
 
+You can right-click items for performing actions:
+
+![item](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-fileman/master/images/kwirthfileman-item.png)
+
+You can switch to list view if you want to view file details (size, date...):
+
+![item-detail](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-fileman/master/images/kwirthfileman-item-detail.png)
+
+You can perform loacl search for filtering file names:
+
+![search](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-fileman/master/images/kwirthfileman-search.png)
+
 Feel free to open issues and ask for more features.
+
 
 ## Status information
 When the file browser is launched, and all along the life of the stream (until it gets stopped or the window is closed), you will receive status information regarding the Kubernetes objects you are watching. This status information is shown on the top of the card (just at the immediate right of the cluster name) including 3 kinds of information:
