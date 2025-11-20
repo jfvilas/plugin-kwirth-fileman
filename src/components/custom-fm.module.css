@@ -11,5 +11,9 @@
 
 :global(.file-explorer .breadcrumb) {
   padding-top: 10px;
-  min-height: 28px;
+  min-height: 36px;
+}
+
+:global(.file-explorer .statusbar) {
+  padding-top: 4px;
 }

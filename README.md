@@ -1,8 +1,9 @@
 # Backstage frontend KwirthFileman plugin
-+++ALL PPENDING
 This package is a Backstage frontend plugin for **managing Kubernetes containers' filesystems** in real-time via Kwirth.
 
-This Backstage plugin allows you to live-stream Kubernetes logs associated to your Backstage entities directly inside your Backstage instance. It's very important to understand that for this plugin to work...:
+This Backstage plugin allows you to use a file-explorer-like plugin for navigating through the filesystem, allowing users to examine the content, and also perform file operations like rename, delete, copy, move, copy/cut/paste...
+
+In addtion users can also download files (or folders), upload files and even preview file content.
 
   - You need to install the Kwirth [Backstage backend plugin](https://www.npmjs.com/package/@jfvilas/plugin-kwirth-backend).
   - You need to install Kwirth on your Kubernetes cluster, that is, this plugin is just another frontend for [Kwirth](https://jfvilas.github.io/kwirth).
@@ -17,44 +18,43 @@ Following table shows version compatibility between this Kwirth Backstage plugin
 
 | Plugin Kwirth version | Kwirth version |
 |-|-|
-|0.13.5|0.5.0|
+|0.13.5|0.4.131|
 
 
 ## What is this plugin for?
-This Backstage plugin adds Backstage a feature for viewing real-time Kubernetes logs of your Backstage entities directly inside Backstage frontend application. The plugin will be enabled for any entity that is correctly tagged (according to Backstage Kubernetes core feature) and its correpsonding Kubernetes resources are found on any of the clusters that have been added to Backstage.
+This Backstage plugin adds Backstage a feature for working with Kubernetes containers filesystems and manage container data as user would do with a Gnome, the Windows file explorer or an Apple file manager.
 
-When KwirthLog is correctly installed and configured, it is possible to view Kubernetes logs on your Backstage like in this sample:
+When KwirthFileman is correctly installed and configured, it is possible to manage Kubernetes containers filesystems like this:
 
-![kwirth-running](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-log/master/images/kwirthlog-running.png)
+![kwirth-running](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-fileman/master/images/kwirthfileman-running.png)
 
-This frontend plugin includes just the visualization of log information. All needed configuration, and specially **permission settings**, are done in the backend plugin and the app-config.yaml. You can restrict access to pods, namespaces, clusters, etc... by configuring permissions to be applied on the backend plugin.
+This frontend plugin includes just the visualization of filesystems. All needed configuration, and specially **permission settings**, are done in the backend plugin and the app-config.yaml. You can restrict access to pods, namespaces, clusters, etc... by configuring permissions to be applied on the backend plugin.
 
 ## How does it work?
 Let's explain this by following a user working sequence:
 
 1. A Backstage user searchs for an entity in the Backstage.
-2. In the entity page there will be a new tab named 'KWIRTHLOG'.
-3. When the user clicks on KWIRTHLOG the frontend plugin sends a request to the backend Kiwrth plugin asking for logging information on all Kubernetes clusters available.
-4. Next step is to identify the Kubernetes objects that match requested entity. As well as it occurs with other Backstage Kwirth plugins, Kwirth implements two strategies for getting the listo of kubernetes objects that match:
+2. In the entity page there will be a new tab named 'KWIRTHFILEMAN'.
+3. When the user clicks on KWIRTHFILEMAN the frontend plugin sends a request to the backend Kwirth plugin asking for containers information on all Kubernetes clusters available.
+4. Next step is to identify the Kubernetes objects that match requested entity. As well as it occurs with other Backstage Kwirth plugins, Kwirth implements two strategies for getting the list of kubernetes objects that match:
   - Option 1. Your catalog-info contains an annotation of this type: **backstage.io/kubernetes-id**. In this case, the Backstage Kwirth backend plugin sends requests to the Kwirth instances that are running inside all the clusters added to Backstage. These requests ask for the following: *'Tell me all the pods that are labeled with the kubernetes-id label and do correspond with the entity I'm looking for'*. In response to this query, each Kwirth instance answers with a list of pods and the namespaces where they are running.
   - Option 2. Your catalog-info contains an annotation of this type: **backstage.io/kubernetes-label-selector**. In this case, the Backstage Kwirth backend plugin sends requests to the Kwirth instances that are running inside all the clusters added to Backstage. These requests ask for the following: *'Tell me all the pods whose labels match with the kubernetes-label-selector label selector*. In response to this query, each Kwirth instance answers with a list of pods and the namespaces where they are running.
 5. The Kwirth backend plugin checks then the permissions of the connected user and prunes the pods list removing the ones that the user has not access to.
-6. With the final pod list, the backend plugin sends requests to the Kwirth instances on the clusters asking for API Keys specific for streaming pod logs.
-7. With all this information, the backend builds a unique response containing all the pods the user have access to, and all the API keys needed to access those logs.
+6. With the final pod list, the backend plugin sends requests to the Kwirth instances on the clusters asking for API Keys specific for accessing containers filesystems.
+7. With all this information, the backend builds a unique response containing all the pods the user have access to, and all the API keys needed to access the filesystems.
 
-If everyting is correctly configured and tagged, the user should see a list of clusters. When selecting a cluster, the user should see a list of namespaces where the entity is running.
+If everyting is correctly configured and tagged, the user should see a list of clusters. When selecting a cluster, the user should see a control for starting and stoppingthe file system browser. When th euser clicks PLAY (on the right upper side), the file browser appears.
 
 
 ## Installation
-It's very simple and straightforward, it is in fact very similar to any other forntend Backstage plugin.
+It's very simple and straightforward, it is in fact very similar to any other frontend Backstage plugin.
 
 1. Install corresponding Backstage backend plugin [more information here](https://www.npmjs.com/package/@jfvilas/plugin-kwirth-backend).
-
 2. Install this Backstage frontend plugin:
 
     ```sh
     # From your Backstage root directory
-    yarn --cwd packages/app add @jfvilas/plugin-kwirth-log @jfvilas/plugin-kwirth-frontend @jfvilas/plugin-kwirth-common @jfvilas/kwirth-common
+    yarn --cwd packages/app add @jfvilas/plugin-kwirth-fileman @jfvilas/plugin-kwirth-frontend @jfvilas/plugin-kwirth-common @jfvilas/kwirth-common
     ```
 
 3. Make sure the [Kwirth backend plugin](https://www.npmjs.com/package/@jfvilas/plugin-kwirth-backend#configure) is installed and configured.
@@ -65,46 +65,47 @@ It's very simple and straightforward, it is in fact very similar to any other fo
 ## Configuration: Entity Pages
 For Kwirth plugin to be usable on the frontend, you must tailor your Entity Page to include the Kwirth components.
 
-1. Add the plugin as a tab in your Entity pages:
+#### 1. Add the plugin as a tab in your Entity pages:
 
-    Firstly, import the plugin module.
-    ```typescript
-    // In packages/app/src/components/catalog/EntityPage.tsx
-    import { EntityKwirthLogContent } from '@jfvilas/plugin-kwirth-log';
-    import { isKwirthAvailable } from '@jfvilas/plugin-kwirth-common';
-    ```
+Firstly, import the plugin module.
 
-    Then, add a tab to your EntityPage (the 'if' is optional, you can keep the 'KwirthLog' tab always visible if you prefer to do it that way).
-    ```jsx
-    // Note: Add to any other Pages as well (e.g. defaultEntityPage or webSiteEntityPage, for example)
-    const serviceEntityPage = (
-      <EntityLayout>
-        {/* other tabs... */}
-        <EntityLayout.Route if={isKwirthAvailable} path="/kwirthlog" title="KwirthLog">
-          <EntityKwirthLogContent enableRestart={false} />
-        </EntityLayout.Route>
-      </EntityLayout>
-    )
-    ```
+```typescript
+// In packages/app/src/components/catalog/EntityPage.tsx
+import { EntityKwirthFilemanContent } from '@jfvilas/plugin-kwirth-fileman';
+import { isKwirthAvailable } from '@jfvilas/plugin-kwirth-common';
+```
 
-    You can setup some default *viewing* options on the `EntityKwirthLogContent` component, so, when the entity loads the default options will be set. These options are:
-    - `formStart`
-    - `showNames`
-    - `showTimestamp`
-    - `followLog`
-    - `wrapLines`
-    (The meaning of these properties are explained at the end of this document)
+Then, add a tab to your EntityPage (the `if` is optional, you can keep the 'KwirthFileman' tab always visible if you prefer to do it that way).
 
-    For example, you could setup your default log stream like this:
-    ```jsx
-      ...
-      <EntityLayout.Route if={isKwirthAvailable} path="/kwirthlog" title="KwirthLog">
-        <EntityKwirthLogContent enableRestart={false} fromStrat={true} showTimestamp={true} wrapLines={true} />
-      </EntityLayout.Route>
-      ...
-    ```
+```jsx
+// Note: Add to any other Pages as well (e.g. defaultEntityPage or webSiteEntityPage, for example)
+const serviceEntityPage = (
+  <EntityLayout>
+    {/* other tabs... */}
+    <EntityLayout.Route if={isKwirthAvailable} path="/kwirthfileman" title="KwirthFileman">
+      <EntityKwirthFilemanContent/>
+    </EntityLayout.Route>
+  </EntityLayout>
+)
+```
 
-2. Label your catalog-info according to one of these two startegies:
+You can setup some default options on the `EntityKwirthfilemanContent` component. These options are:
+- `hideVersion` (optional `boolean`) if set to `true`, version information updates will not be shown.
+- `excludeContainers` (optional `string[]`), an array of container names that will be excluded file browser. For example, if you have pods that include sidecars that you want your users to not to access, you can exclude them using this property.
+
+What follows is an example on how to use these properties:
+
+```jsx
+  ...
+  <EntityLayout.Route if={isKwirthAvailable} path="/kwirthfileman" title="KwirthFileman">
+    <EntityKwirthFilemanContent hideVersion excludeContainers={['istio-proxy']} />
+  </EntityLayout.Route>
+  ...
+```
+
+
+#### 2. Label your catalog-info
+Use one of these strategies:
 
 - **Strategy 1: one-to-one**. Add `backstage.io/kubernetes-id` annotation to your `catalog-info.yaml` for the entities deployed to Kubernetes you want to work with on Backstage. This is the same annotation that the Kubernetes core plugin uses, so, maybe you already have added it to your components. Exmaple:
 
@@ -154,70 +155,39 @@ For Kwirth plugin to be usable on the frontend, you must tailor your Entity Page
     ```
 
 ## Ready, set, go!
-If you followed all these steps and our work is well done (not sure on this), you would see a 'KwirthLog' tab in your **Entity Page**, like this one:
+If you followed all these steps, you would see a 'KwirthFileman' tab in your **Entity Page**, like this one:
 
-![kwirthlog-tab](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-log/master/images/kwirthlog-tab.png)
+![kwirthfileman-tab](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-fileman/master/images/kwirthfileman-tab.png)
 
 When you access the tab, if you have not yet tagged your entities you would see a message like this one explaning how to do that:
 
-![notfound](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-log/master/images/kwirthlog-notfound.png)
-
-But, if the component is found on some of the clusters configured in Backstage, your screen will look like following one, showing some cluster that can be selected and some others that can't.
-
-![notfound-some](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-log/master/images/kwirthlog-notfound-on-cluster.png)
+![notfound](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-fileman/master/images/kwirthfileman-notfound.png)
 
 Once you tagged your entities and your Kubernetes objects correctly, you should see something similar to this:
 
-![available](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-log/master/images/kwirthlog-available.png)
+![available](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-fileman/master/images/kwirthfileman-available.png)
 
-KwirthLog is ready to show logs!!
+KwirthFileman is ready for file system works!!
 
-Just *select the cluster* on the cluster card and eventually set the *options* you want for the log streaming. On the card on right, you will see all the Kubernetes namespaces available and a stream control (download, play, pause and stop). *Select a namespace*, and two selectros for 'pod' and 'conatiner' will become available just under the namespace chips.
+First *select the cluster* on the cluster card. On the card on right, you will see a control (play, pause and stop), press PLAY and the file borser should appear. **Data is retrieved in real-time**, so the file browser will be populed as dthe data arrives.
 
-Select the pod/pods and container/containers you want to stream log, *click PLAY* button and the party starts!!
-
-Now you will see your log refreshing in real-time. If you selected more than one namespace/pod/contianer, the log stream will contain all the source log lines streamed following time line.
-
-![running](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-log/master/images/kwirthlog-running.png)
-
-### Filtering
-When the log stream starts you will see a filter text field you can use for filtering messages. The use is as follows:
-  - If you type something, the messages (or the pod names or the container names) are expected to match that text.
-  - If you select `Aa`, the text match will be performed taking **casing** into account.
-  - If you select `.*` then the text entered will be treated as a regular expression.
-  - You can select *casing* and *regex* if you want regexes to match taking casing into account.
+![running](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-fileman/master/images/kwirthfileman-running.png)
 
 Feel free to open issues and ask for more features.
 
 ## Status information
-When the log stream starts, and all along the life of the stream (until it gets stopped or the window is closed), you will receive status information regarding the kubernetes objects you are watching. This status information is shown on the top of the card (just at the immediate right of the cluster name) including 3 kinds of information:
+When the file browser is launched, and all along the life of the stream (until it gets stopped or the window is closed), you will receive status information regarding the Kubernetes objects you are watching. This status information is shown on the top of the card (just at the immediate right of the cluster name) including 3 kinds of information:
 
   - **Info**. Informaiton regarding pod management at Kubernetes cluster level (new pod, pod ended or pod modified).
-  - **Warning**. Warnings related to the log stream.
+  - **Warning**. Warnings related to the data streaming.
   - **Error**. If there is an error in the stream, like invalid key use, or erroneous pod tagging, erros will be shown here.
 
 The icons will light up in its corresponding color when a new message arrives.
 
+**It is important to undertand taht, as it occurs with other Kwirth plugins, data is refresed in real-time, so pods will appear and disappear according to Kubernetes activities.**
+
 This is how it feels:
-![status info](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-log/master/images/kwirthlog-status-info.png)
+![status info](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-fileman/master/images/kwirthfileman-status-info.png)
 
 If you click on one of the status icons when theyr are enableds (coloured), you will see the detail of the status.
-![status detail](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-log/master/images/kwirthlog-status-detail.png)
-
-## Log stream options
-The log streaming system implemented in KwirthLog has some configuration options whose meaning is explained below.
-
-### From start (`fromStart`)
-If checked, the log streams will be retieved since pod start time. Please be careful with this option, it may impact your browser performance.
-
-### Show message time (`showTimestamp`)
-Decide whether to show timestamps next to messages or not. Usually your application logs messages with timestamp, but it this doesn't occur you can add message time (as provided by Kubernetes) to your messages.
-
-### Show pod names (`showNames`)
-Show pod names and container names next to messages. You may need to use this option if you are showing messages from different sources.
-
-### Follow log stream (`followLog`)
-If you activate this option, the log stream wil move to the end wehn a new messages arrives (it's like a `tail -f`).
-
-### Wrap log lines (`wrapLines`)
-Normally, KwirthLog will add hotizontal and vertical scrollers as needed in order to preserve original log lines, but you can activate this option to wrap lines and not to show horizontal scroller.
+![status detail](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-fileman/master/images/kwirthfileman-status-detail.png)

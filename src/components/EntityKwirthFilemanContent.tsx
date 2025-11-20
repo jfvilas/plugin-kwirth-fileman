@@ -27,7 +27,6 @@ import { accessKeySerialize, InstanceMessageActionEnum, InstanceConfigViewEnum, 
 
 // kwirth fileman components
 import { KwirthNews, ComponentNotFound, StatusLog, ClusterList, ErrorType } from '@jfvilas/plugin-kwirth-frontend'
-import { VERSION } from '../index'
 
 // Material-UI
 import { Grid, Card, CardHeader, Box, IconButton, Typography } from '@material-ui/core'
@@ -44,11 +43,14 @@ import { v4 as uuid } from 'uuid'
 import { FileManager, IError, IFileData } from '@jfvilas/react-file-manager'
 import '@jfvilas/react-file-manager/dist/style.css'
 import styles from './custom-fm.module.css'
+import { VERSION } from '../version'
 
 export interface IEntityKwirthFilemanProps {
+    hideVersion?: boolean
+    excludeContainers?: string[]
 }
 
-export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (_props:IEntityKwirthFilemanProps) => { 
+export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (props:IEntityKwirthFilemanProps) => { 
     const { entity } = useEntity()
     const kwirthFilemanApi = useApi(kwirthFilemanApiRef)
     const alertApi = useApi(alertApiRef)
@@ -169,7 +171,7 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
                     setSelectedNamespaces(validNamespaces)
                     let podList = getPodList (cluster.pods, validNamespaces)
                     setSelectedPodNames(podList.map(pod => pod.name))
-                    setSelectedContainerNames(getContainerList(cluster.pods, validNamespaces, podList.map(pod => pod.name)))
+                    setSelectedContainerNames(getContainerList(cluster.pods, validNamespaces, podList.map(pod => pod.name), props.excludeContainers || []))
                 }
                 else {
                     setSelectedNamespaces([])
@@ -724,11 +726,13 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
                                 <ClusterList resources={validClusters} selectedClusterName={selectedClusterName} onSelect={onSelectCluster}/>
                             </Card>
                         </Grid>
-                        <Grid item>
-                            <Card>
-                                <KwirthNews latestVersions={backendInfo} backendVersion={backendVersion} ownVersion={VERSION}/>
-                            </Card>
-                        </Grid>
+                        {!props.hideVersion &&
+                            <Grid item>
+                                <Card>
+                                    <KwirthNews latestVersions={backendInfo} backendVersion={backendVersion} ownVersion={VERSION}/>
+                                </Card>
+                            </Grid>
+                        }
                     </Grid>
                 </Box>
 
