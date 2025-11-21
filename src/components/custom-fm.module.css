@@ -17,3 +17,7 @@
 :global(.file-explorer .statusbar) {
   padding-top: 4px;
 }
+
+:global(.file-explorer .file-item) {
+  font-size: 12px;
+}

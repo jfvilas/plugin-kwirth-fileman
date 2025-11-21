@@ -50,6 +50,14 @@ export interface IEntityKwirthFilemanProps {
     excludeContainers?: string[]
 }
 
+import SvgIconNamespace from'./icons/ns.svg'
+import SvgIconPod from'./icons/pod.svg'
+import SvgIconContainer from'./icons/docker-mark-blue.svg'
+
+const IconNamespace = (props: {height?:number}) => { return <img src={SvgIconNamespace} alt='ns' height={`${props.height||16}px`}/> }
+const IconPod = (props: {height?:number}) => { return <img src={SvgIconPod} alt='pod' height={`${props.height||16}px`}/> }
+const IconContainer = (props: {height?:number}) => { return <img src={SvgIconContainer} height={`${props.height||16}px`}/> }
+
 export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (props:IEntityKwirthFilemanProps) => { 
     const { entity } = useEntity()
     const kwirthFilemanApi = useApi(kwirthFilemanApiRef)
@@ -90,6 +98,11 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
         rename: true,
         upload: true
     }
+
+    let icons = new Map()
+    icons.set('namespace', { open:<IconNamespace height={18}/>, closed:<IconNamespace height={18}/>, grid:<IconNamespace height={40}/>, list:<IconNamespace height={18}/>, default:<IconNamespace height={18}/> })
+    icons.set('pod', { open:<IconPod height={18}/>, closed:<IconPod height={18}/>, grid:<IconPod height={40}/>, list:<IconPod height={18}/>, default:<IconPod height={18}/> })
+    icons.set('container', { open:<IconContainer/>, closed:<IconContainer/>, grid:<IconContainer height={34}/>, list:<IconContainer height={16}/>, default:<IconContainer height={16}/> })
 
     interface IFileUploadConfig  { 
         url: string
@@ -235,13 +248,11 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
                                     let podNames = Array.from (new Set (data.filter(a => a.split('/')[0]===ns).map(o => o.split('/')[1])))
                                     podNames.map(p => {
                                         if (!files.current.some(f => f.path === '/'+ns+'/'+p)) {
-                                            //filemanData.files.push({ name: p, isDirectory: true, path: '/'+ns+'/'+p, class:'pod' })
                                             files.current.push ({ name: p, isDirectory: true, path: '/'+ns+'/'+p, class:'pod' })
                                         }
                                         let conts = Array.from (new Set (data.filter(a => a.split('/')[0]===ns && a.split('/')[1]===p).map(o => o.split('/')[2])))
                                         conts.map(c => {
                                             if (!files.current.some(f => f.path === '/'+ns+'/'+p+'/'+c)) {
-                                                //filemanData.files.push ({ name: c, isDirectory: true, path: '/'+ns+'/'+p+'/'+c, class:'container' })
                                                 files.current.push ({ name: c, isDirectory: true, path: '/'+ns+'/'+p+'/'+c, class:'container' })
                                             }
                                         })
@@ -752,28 +763,28 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
                         </Card>
                         { started && <Grid ref={filemanBoxRef} style={{height: `calc(100vh - ${filemanBoxTop}px - 35px)`}}>
                             <FileManager 
-                            className={styles.customFm}
-                            files={stateFiles}
-                            filePreviewPath='http://avoid-console-error'
-                            primaryColor='#1976d2'
-                            fontFamily='"Helvetica Neue", Helvetica, Roboto, Arial, sans-serif'
-                            height='100%'
-                            actions={new Map()}
-                            icons={new Map()} 
-                            fileUploadConfig={fileUploadConfig} 
-                            onCreateFolder={onCreateFolder}
-                            onError={onError}
-                            onRename={onRename}
-                            onPaste={onPaste}
-                            onDelete={onDelete}
-                            onFolderChange={onFolderChange}
-                            onRefresh={onRefresh}
-                            onFileUploading={onFileUploading}
-                            onDownload={onDownload}
-                            enableFilePreview={false}
-                            initialPath={''}
-                            permissions={permissions}
-                        />
+                                className={styles.customFm}
+                                files={stateFiles}
+                                filePreviewPath='http://avoid-console-error'
+                                primaryColor='#1976d2'
+                                fontFamily='"Helvetica Neue", Helvetica, Roboto, Arial, sans-serif'
+                                height='100%'
+                                actions={new Map()}
+                                icons={icons} 
+                                fileUploadConfig={fileUploadConfig}
+                                onCreateFolder={onCreateFolder}
+                                onError={onError}
+                                onRename={onRename}
+                                onPaste={onPaste}
+                                onDelete={onDelete}
+                                onFolderChange={onFolderChange}
+                                onRefresh={onRefresh}
+                                onFileUploading={onFileUploading}
+                                onDownload={onDownload}
+                                enableFilePreview={false}
+                                initialPath={''}
+                                permissions={permissions}
+                            />
                         </Grid>}
                     </>}
                 </Box>
