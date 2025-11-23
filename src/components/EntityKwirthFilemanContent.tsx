@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import React, { useEffect, useRef, useState } from 'react'
+import { v4 as uuid } from 'uuid'
 import useAsync from 'react-use/esm/useAsync'
 
 import { Progress, WarningPanel } from '@backstage/core-components'
@@ -23,13 +24,19 @@ import { MissingAnnotationEmptyState, useEntity } from '@backstage/plugin-catalo
 
 // kwirth
 import { kwirthFilemanApiRef } from '../api'
-import { accessKeySerialize, InstanceMessageActionEnum, InstanceConfigViewEnum, IInstanceMessage, InstanceMessageTypeEnum, SignalMessageLevelEnum, InstanceConfigObjectEnum, InstanceConfig, InstanceMessageFlowEnum, SignalMessageEventEnum, ISignalMessage } from '@jfvilas/kwirth-common'
+import { accessKeySerialize, InstanceMessageActionEnum, InstanceConfigViewEnum, IInstanceMessage, InstanceMessageTypeEnum, SignalMessageLevelEnum, InstanceConfigObjectEnum, IInstanceConfig, InstanceMessageFlowEnum, SignalMessageEventEnum, ISignalMessage } from '@jfvilas/kwirth-common'
 
 // kwirth fileman components
 import { KwirthNews, ComponentNotFound, StatusLog, ClusterList, ErrorType } from '@jfvilas/plugin-kwirth-frontend'
+import { FileManager, IError, IFileData } from '@jfvilas/react-file-manager'
+import { VERSION } from '../version'
 
 // Material-UI
 import { Grid, Card, CardHeader, Box, IconButton, Typography } from '@material-ui/core'
+
+// styles
+import '@jfvilas/react-file-manager/dist/style.css'
+import styles from './custom-fm.module.css'
 
 // Icons
 import PlayIcon from '@material-ui/icons/PlayArrow'
@@ -38,25 +45,20 @@ import StopIcon from '@material-ui/icons/Stop'
 import InfoIcon from '@material-ui/icons/Info'
 import WarningIcon from '@material-ui/icons/Warning'
 import ErrorIcon from '@material-ui/icons/Error'
-import KwirthFilemanLogo from '../assets/kwirthfileman-logo.svg'
-import { v4 as uuid } from 'uuid'
-import { FileManager, IError, IFileData } from '@jfvilas/react-file-manager'
-import '@jfvilas/react-file-manager/dist/style.css'
-import styles from './custom-fm.module.css'
-import { VERSION } from '../version'
+import LogoIcon from '../assets/kwirthfileman-logo.svg'
+import SvgIconNamespace from'./icons/ns.svg'
+import SvgIconPod from'./icons/pod.svg'
+import SvgIconContainer from'./icons/docker-mark-blue.svg'
 
 export interface IEntityKwirthFilemanProps {
     hideVersion?: boolean
     excludeContainers?: string[]
 }
 
-import SvgIconNamespace from'./icons/ns.svg'
-import SvgIconPod from'./icons/pod.svg'
-import SvgIconContainer from'./icons/docker-mark-blue.svg'
 
-const IconNamespace = (props: {height?:number}) => { return <img src={SvgIconNamespace} alt='ns' height={`${props.height||16}px`}/> }
-const IconPod = (props: {height?:number}) => { return <img src={SvgIconPod} alt='pod' height={`${props.height||16}px`}/> }
-const IconContainer = (props: {height?:number}) => { return <img src={SvgIconContainer} height={`${props.height||16}px`}/> }
+const NamespaceIcon = (props: {height?:number}) => { return <img src={SvgIconNamespace} alt='ns' height={`${props.height||16}px`}/> }
+const PodIcon = (props: {height?:number}) => { return <img src={SvgIconPod} alt='pod' height={`${props.height||16}px`}/> }
+const ContainerIcon = (props: {height?:number}) => { return <img src={SvgIconContainer} height={`${props.height||16}px`}/> }
 
 export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (props:IEntityKwirthFilemanProps) => { 
     const { entity } = useEntity()
@@ -100,9 +102,9 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
     }
 
     let icons = new Map()
-    icons.set('namespace', { open:<IconNamespace height={18}/>, closed:<IconNamespace height={18}/>, grid:<IconNamespace height={40}/>, list:<IconNamespace height={18}/>, default:<IconNamespace height={18}/> })
-    icons.set('pod', { open:<IconPod height={18}/>, closed:<IconPod height={18}/>, grid:<IconPod height={40}/>, list:<IconPod height={18}/>, default:<IconPod height={18}/> })
-    icons.set('container', { open:<IconContainer/>, closed:<IconContainer/>, grid:<IconContainer height={34}/>, list:<IconContainer height={16}/>, default:<IconContainer height={16}/> })
+    icons.set('namespace', { open:<NamespaceIcon height={18}/>, closed:<NamespaceIcon height={18}/>, grid:<NamespaceIcon height={40}/>, list:<NamespaceIcon height={18}/>, default:<NamespaceIcon height={18}/> })
+    icons.set('pod', { open:<PodIcon height={18}/>, closed:<PodIcon height={18}/>, grid:<PodIcon height={40}/>, list:<PodIcon height={18}/>, default:<PodIcon height={18}/> })
+    icons.set('container', { open:<ContainerIcon/>, closed:<ContainerIcon/>, grid:<ContainerIcon height={34}/>, list:<ContainerIcon height={16}/>, default:<ContainerIcon height={16}/> })
 
     interface IFileUploadConfig  { 
         url: string
@@ -250,8 +252,9 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
                                         if (!files.current.some(f => f.path === '/'+ns+'/'+p)) {
                                             files.current.push ({ name: p, isDirectory: true, path: '/'+ns+'/'+p, class:'pod' })
                                         }
-                                        let conts = Array.from (new Set (data.filter(a => a.split('/')[0]===ns && a.split('/')[1]===p).map(o => o.split('/')[2])))
-                                        conts.map(c => {
+                                        let containers = Array.from (new Set (data.filter(a => a.split('/')[0]===ns && a.split('/')[1]===p).map(o => o.split('/')[2])))
+                                        containers = containers.filter(c => !props.excludeContainers?.includes(c))
+                                        containers.map(c => {
                                             if (!files.current.some(f => f.path === '/'+ns+'/'+p+'/'+c)) {
                                                 files.current.push ({ name: c, isDirectory: true, path: '/'+ns+'/'+p+'/'+c, class:'container' })
                                             }
@@ -439,7 +442,7 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
                     }
                 }
             }
-            let iConfig:InstanceConfig = {
+            let iConfig:IInstanceConfig = {
                 channel: 'fileman',
                 objects: InstanceConfigObjectEnum.PODS,
                 action: InstanceMessageActionEnum.START,
@@ -750,7 +753,7 @@ export const EntityKwirthFilemanContent: React.FC<IEntityKwirthFilemanProps> = (
                 <Box sx={{ flexGrow: 1, flex:1, overflow:'hidden', p:1, marginLeft:'8px' }}>
 
                     { !selectedClusterName && 
-                        <img src={KwirthFilemanLogo} alt='No cluster selected' style={{ left:'40%', marginTop:'10%', width:'20%', position:'relative' }} />
+                        <img src={LogoIcon} style={{ left:'40%', marginTop:'10%', width:'20%', position:'relative' }} />
                     }
 
                     { selectedClusterName && <>

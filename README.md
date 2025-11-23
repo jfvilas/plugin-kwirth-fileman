@@ -1,7 +1,7 @@
 # Backstage frontend KwirthFileman plugin
 This package is a Backstage frontend plugin for **managing Kubernetes containers' filesystems** in real-time via Kwirth.
 
-This Backstage plugin allows you to use a file-explorer-like plugin for navigating through the filesystem, allowing users to examine the content, and also perform file operations like rename, delete, copy, move, copy/cut/paste...
+KwirthFileman plugin allows you to use a file-explorer-like plugin for navigating through the filesystem, allowing users to examine the content, and also perform file operations like rename, delete, copy, move, copy/cut/paste...
 
 In addtion users can also download files (or folders), upload files and even preview file content.
 
@@ -28,12 +28,12 @@ When KwirthFileman is correctly installed and configured, it is possible to mana
 
 ![kwirth-running](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-fileman/master/images/kwirthfileman-running.png)
 
-This frontend plugin includes just the visualization of filesystems. All needed configuration, and specially **permission settings**, are done in the backend plugin and the app-config.yaml. You can restrict access to pods, namespaces, clusters, etc... by configuring permissions to be applied on the backend plugin.
+This frontend plugin includes just the visualization of filesystems. All needed configuration, and specially **permission settings**, are done in the backend plugin and the app-config.yaml. You can restrict access to pods, namespaces, clusters, containers, etc... by configuring permissions to be applied on the backend plugin.
 
 ## How does it work?
 Let's explain this by following a user working sequence:
 
-1. A Backstage user searchs for an entity in the Backstage.
+1. A Backstage user searchs for an entity in the Backstage instance.
 2. In the entity page there will be a new tab named 'KWIRTHFILEMAN'.
 3. When the user clicks on KWIRTHFILEMAN the frontend plugin sends a request to the backend Kwirth plugin asking for containers information on all Kubernetes clusters available.
 4. Next step is to identify the Kubernetes objects that match requested entity. As well as it occurs with other Backstage Kwirth plugins, Kwirth implements two strategies for getting the list of kubernetes objects that match:
@@ -43,7 +43,7 @@ Let's explain this by following a user working sequence:
 6. With the final pod list, the backend plugin sends requests to the Kwirth instances on the clusters asking for API Keys specific for accessing containers filesystems.
 7. With all this information, the backend builds a unique response containing all the pods the user have access to, and all the API keys needed to access the filesystems.
 
-If everyting is correctly configured and tagged, the user should see a list of clusters. When selecting a cluster, the user should see a control for starting and stoppingthe file system browser. When th euser clicks PLAY (on the right upper side), the file browser appears.
+If everyting is correctly configured and tagged, the user should see a list of clusters. When selecting a cluster, the user should see a control for starting and stopping the file system browser. When the user clicks PLAY (on the right upper side), the file browser appears.
 
 
 ## Installation
@@ -51,22 +51,19 @@ It's very simple and straightforward, it is in fact very similar to any other fr
 
 1. Install corresponding Backstage backend plugin [more information here](https://www.npmjs.com/package/@jfvilas/plugin-kwirth-backend).
 2. Install this Backstage frontend plugin:
-
-    ```sh
-    # From your Backstage root directory
-    yarn --cwd packages/app add @jfvilas/plugin-kwirth-fileman @jfvilas/plugin-kwirth-frontend @jfvilas/plugin-kwirth-common @jfvilas/kwirth-common
-    ```
-
+   ```sh
+   # From your Backstage root directory
+   yarn --cwd packages/app add @jfvilas/plugin-kwirth-fileman @jfvilas/plugin-kwirth-frontend @jfvilas/plugin-kwirth-common @jfvilas/kwirth-common
+   ```
 3. Make sure the [Kwirth backend plugin](https://www.npmjs.com/package/@jfvilas/plugin-kwirth-backend#configure) is installed and configured.
-
 4. Restart your Backstage instance.
 
 
 ## Configuration: Entity Pages
 For Kwirth plugin to be usable on the frontend, you must tailor your Entity Page to include the Kwirth components.
 
-#### 1. Add the plugin as a tab in your Entity pages:
 
+#### 1. Add the plugin as a tab in your Entity pages:
 Firstly, import the plugin module.
 
 ```typescript
@@ -109,11 +106,11 @@ Use one of these strategies:
 
 - **Strategy 1: one-to-one**. Add `backstage.io/kubernetes-id` annotation to your `catalog-info.yaml` for the entities deployed to Kubernetes you want to work with on Backstage. This is the same annotation that the Kubernetes core plugin uses, so, maybe you already have added it to your components. Exmaple:
 
-    ```yaml
-    metadata:
-      annotations:
-        backstage.io/kubernetes-id: entity001
-    ```
+  ```yaml
+  metadata:
+    annotations:
+      backstage.io/kubernetes-id: entity001
+  ```
 
 - **Strategy 2: use selectors**. Add `backstage.io/kubernetes-label-selector` annotation to your `catalog-info.yaml` for the entities you want to work with. This is the same annotation that the Kubernetes core plugin uses, so, maybe you already have added it to your components. The label selector value follows Kubernetes [label selector semantics](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/). Example:
 

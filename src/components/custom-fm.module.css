@@ -6,7 +6,10 @@
 }
 
 :global(.file-explorer .toolbar) {
+  border-top-right-radius: 4px;
+  border-top-left-radius: 4px;
   min-height: 46px;
+  background-color: #fcfcfc;
 }
 
 :global(.file-explorer .breadcrumb) {
@@ -15,9 +18,42 @@
 }
 
 :global(.file-explorer .statusbar) {
-  padding-top: 4px;
+  height: 20px;
 }
 
 :global(.file-explorer .file-item) {
-  font-size: 12px;
+  padding-top: 4px;
+  font-size: 14px;
+}
+
+:global(.file-explorer .sb-folder-name) {
+  font-size: 14px;
+}
+
+:global(.file-explorer .folder-name) {
+  font-size: 14px;
+}
+
+:global(.file-explorer .sb-folders-list)::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+:global(.file-explorer .files)::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+:global(.file-explorer .files) {
+  padding: 2px;
+  column-gap: 2px;
+  row-gap: 2px;
+}
+
+:global(.file-explorer .files .file-item .selection-checkbox) {
+  top: 6px;
+}
+
+:global(.file-explorer .files .file-item-container) {
+  margin: 0 0;
 }
