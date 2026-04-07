@@ -1,5 +1,5 @@
 # Backstage frontend KwirthFileman plugin
-This package is a Backstage frontend plugin for **managing Kubernetes containers' filesystems** in real-time via Kwirth.
+This package is a Backstage frontend plugin for **managing Kubernetes containers' filesystems visually** in real-time via Kwirth.
 
 KwirthFileman plugin allows you to use a file-explorer-like plugin for navigating through the filesystem, allowing users to examine the content, and also perform file operations like rename, delete, copy, move, copy/cut/paste...
 
@@ -8,7 +8,7 @@ In addtion users can also download files (or folders), upload files and even pre
   - You need to install the Kwirth [Backstage backend plugin](https://www.npmjs.com/package/@jfvilas/plugin-kwirth-backend).
   - You need to install Kwirth on your Kubernetes cluster, that is, this plugin is just another frontend for [Kwirth](https://jfvilas.github.io/kwirth).
 
-Kwirth is a really-easy-to-use data-exporting system for Kubernetes that runs in only one pod (*no database is needed*). Refer to Kwirth GitHub project for [info on installation](https://github.com/jfvilas/kwirth?tab=readme-ov-file#installation). Kwirth installation is *one command away* from you.
+Kwirth is a really-easy-to-use data-exporting system for Kubernetes that runs in only one pod (*no database is needed*), in your Desktop with a GUI or in a Docker container. Refer to Kwirth GitHub project for [info on installation](https://github.com/jfvilas/kwirth?tab=readme-ov-file#installation). Kwirth installation is *one command away* from you.
 
 You can access [Kwirth project here](https://github.com/jfvilas/kwirth).
 
@@ -18,17 +18,17 @@ Following table shows version compatibility between this Kwirth Backstage plugin
 
 | Plugin Kwirth version | Kwirth version |
 |-|-|
-|0.13.5|0.4.131|
+|0.14.2|0.5.21|
 
 
 ## What is this plugin for?
-This Backstage plugin adds Backstage a feature for working with Kubernetes containers filesystems and manage container data as user would do with a Gnome, the Windows file explorer or an Apple file manager.
+This Backstage plugin adds Backstage a powerful feature for working with Kubernetes containers' filesystems and manage container data as users would do with a Gnome, the Windows file explorer or an Apple file manager.
 
 When KwirthFileman is correctly installed and configured, it is possible to manage Kubernetes containers filesystems like this:
 
 ![kwirth-running](https://raw.githubusercontent.com/jfvilas/plugin-kwirth-fileman/master/images/kwirthfileman-running.png)
 
-This frontend plugin includes just the visualization of filesystems. All needed configuration, and specially **permission settings**, are done in the backend plugin and the app-config.yaml. You can restrict access to pods, namespaces, clusters, containers, etc... by configuring permissions to be applied on the backend plugin.
+This frontend plugin includes the visualization of filesystems. All needed configuration, and specially **permission settings**, are done in the backend plugin and the app-config.yaml. You can restrict access to pods, namespaces, clusters, containers, etc... by configuring permissions to be applied on the backend plugin.
 
 ## How does it work?
 Let's explain this by following a user working sequence:

@@ -1,0 +1,10 @@
+---
+title: KwirthFileman for Backstage
+author: Julio Fernandez
+authorUrl: https://github.com/jfvilas
+category: Kubernetes
+description: With KwirthFileman you can navigate real-time inside your container's filsystems using a very-user-friendly web-based file explorer.
+documentation: https://github.com/jfvilas/plugin-kwirth-fileman
+iconUrl: https://raw.githubusercontent.com/jfvilas/plugin-kwirth-fileman/master/src/assets/kwirthfileman-logo.png
+npmPackageName: '@jfvilas/plugin-kwirth-fileman'
+addedDate: '2026-04-07'
